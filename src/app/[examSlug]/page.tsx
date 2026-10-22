@@ -6,12 +6,14 @@ import { useCatalogStore } from '@/stores/catalogStore'
 import { useSessionStore } from '@/stores/sessionStore'
 import { BookCard, BOOK_ACCENT_COUNT } from '@/components/catalog/BookCard'
 import { MockSettingsModal, type SelectableItem } from '@/components/catalog/MockSettingsModal'
-import { getQuestionIdsForChapters, getCachedChapters, getBookProgress, type BookProgress } from '@/lib/dexie/cache'
-import { fetchChaptersByBook, fetchQuestionsByIds } from '@/lib/supabase/queries'
+import { PracticeFilterModal } from '@/components/catalog/PracticeFilterModal'
+import { getQuestionIdsForChapters, getCachedBooks, getCachedChapters, getBookProgress, type BookProgress } from '@/lib/dexie/cache'
+import { fetchBooksByExam, fetchChaptersByBook, fetchQuestionsByIds } from '@/lib/supabase/queries'
+import { startMistakesPractice } from '@/lib/session/practice'
 import { Skeleton } from '@/components/ui/skeleton'
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, Loader2 } from 'lucide-react'
 import Link from 'next/link'
-import type { SessionSettings } from '@/types'
+import type { QuestionFilter, SessionSettings } from '@/types'
 
 export default function BooksPage() {
   const params = useParams()
@@ -25,6 +27,10 @@ export default function BooksPage() {
   const [mockLoading, setMockLoading] = useState(false)
   const [mockChapters, setMockChapters] = useState<SelectableItem[]>([])
   const [bookProgressMap, setBookProgressMap] = useState<Record<string, BookProgress>>({})
+  const [mistakesOpen, setMistakesOpen] = useState(false)
+  const [mistakesLoading, setMistakesLoading] = useState(false)
+  const [mistakeChapterIds, setMistakeChapterIds] = useState<string[]>([])
+  const [mistakeCounts, setMistakeCounts] = useState({ correct: 0, incorrect: 0, skipped: 0, unseen: 0, all: 0 })
 
   const exam = exams.find((e) => e.slug === examSlug)
 
@@ -53,6 +59,49 @@ export default function BooksPage() {
     loadProgress()
     return () => { cancelled = true }
   }, [books])
+
+  async function openExamMistakes() {
+    if (!exam) return
+    setMistakesLoading(true)
+    try {
+      let examBooks = books.length > 0 ? books : await getCachedBooks(exam.id)
+      if (examBooks.length === 0) examBooks = await fetchBooksByExam(exam.id)
+
+      const chapterIds: string[] = []
+      const counts = { correct: 0, incorrect: 0, skipped: 0, unseen: 0, all: 0 }
+      for (const b of examBooks) {
+        let bookChapters = await getCachedChapters(b.id)
+        if (bookChapters.length === 0) bookChapters = await fetchChaptersByBook(b.id)
+        for (const c of bookChapters) {
+          chapterIds.push(c.id)
+          counts.correct += c.source_correct_count ?? 0
+          counts.incorrect += c.source_incorrect_count ?? 0
+          counts.skipped += c.source_skipped_count ?? 0
+          counts.unseen += c.source_unknown_count ?? 0
+          counts.all += c.question_count ?? 0
+        }
+      }
+      setMistakeChapterIds(chapterIds)
+      setMistakeCounts(counts)
+      setMistakesOpen(true)
+    } finally {
+      setMistakesLoading(false)
+    }
+  }
+
+  async function handleMistakesStart(filter: QuestionFilter, ids: string[], filters?: QuestionFilter[]) {
+    await startMistakesPractice({
+      scope: 'exam',
+      examId: exam?.id ?? '',
+      bookId: null,
+      chapterId: null,
+      ids,
+      filter,
+      filters,
+      router,
+      initSession,
+    })
+  }
 
   const handleBookMockClick = async (bookId: string) => {
     setMockBookId(bookId)
@@ -142,9 +191,22 @@ export default function BooksPage() {
           <span style={{ color: 'var(--text-primary)' }}>{exam?.name ?? examSlug}</span>
         </nav>
 
-        <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.5px', color: 'var(--text-primary)' }}>
-          {exam?.name ?? examSlug}
-        </h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.5px', color: 'var(--text-primary)' }}>
+            {exam?.name ?? examSlug}
+          </h1>
+          {exam && (
+            <button
+              className="btn-secondary"
+              style={{ marginLeft: 'auto', fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}
+              disabled={mistakesLoading}
+              onClick={openExamMistakes}
+            >
+              {mistakesLoading && <Loader2 style={{ width: 14, height: 14 }} className="animate-spin" />}
+              Practice mistakes
+            </button>
+          )}
+        </div>
         <p style={{ marginTop: 4, fontSize: 14, color: 'var(--text-secondary)' }}>
           Select a book to view chapters.
         </p>
@@ -202,6 +264,19 @@ export default function BooksPage() {
             })}
           </div>
         )}
+
+        <PracticeFilterModal
+          open={mistakesOpen}
+          onOpenChange={setMistakesOpen}
+          scope="exam"
+          title={exam?.name ?? examSlug}
+          chapterIds={mistakeChapterIds}
+          examId={exam?.id ?? ''}
+          bookId={null}
+          chapterId={null}
+          counts={mistakeCounts}
+          onStart={handleMistakesStart}
+        />
 
         <MockSettingsModal
           open={mockSettingsOpen}

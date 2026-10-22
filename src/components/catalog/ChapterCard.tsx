@@ -26,17 +26,27 @@ interface ChapterCardProps {
   onLoad: (chapterId: string) => Promise<void>
   stats: ChapterStats | null
   onMockClick?: (chapterId: string) => void
+  onMistakesClick?: (chapterId: string) => void
   onDelete?: (chapterId: string) => Promise<void>
   progressPercent?: number
+  sourceCounts?: Pick<Chapter, 'source_correct_count' | 'source_incorrect_count' | 'source_skipped_count' | 'source_unknown_count'>
 }
 
-export function ChapterCard({ chapter, loaded, onLoad, stats, onMockClick, onDelete, progressPercent = 0 }: ChapterCardProps) {
+export function ChapterCard({ chapter, loaded, onLoad, stats, onMockClick, onMistakesClick, onDelete, progressPercent = 0, sourceCounts }: ChapterCardProps) {
   const [loading, setLoading] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [infoOpen, setInfoOpen] = useState(false)
   const [animatedProgress, setAnimatedProgress] = useState(0)
   const router = useRouter()
   const initSession = useSessionStore((s) => s.initSession)
+
+  const outcomes = {
+    correct: sourceCounts?.source_correct_count ?? chapter.source_correct_count ?? 0,
+    incorrect: sourceCounts?.source_incorrect_count ?? chapter.source_incorrect_count ?? 0,
+    skipped: sourceCounts?.source_skipped_count ?? chapter.source_skipped_count ?? 0,
+    unknown: sourceCounts?.source_unknown_count ?? chapter.source_unknown_count ?? 0,
+  }
+  const hasMistakes = outcomes.incorrect + outcomes.skipped > 0
 
   // Animate progress bar from 0 on mount
   useEffect(() => {
@@ -151,6 +161,17 @@ export function ChapterCard({ chapter, loaded, onLoad, stats, onMockClick, onDel
             {chapter.concept_count != null && <span>{chapter.concept_count} concepts</span>}
             {chapter.concept_count != null && chapter.question_count != null && <span> · </span>}
             {chapter.question_count != null && <span>{chapter.question_count} questions</span>}
+            {(outcomes.correct > 0 || outcomes.incorrect > 0 || outcomes.skipped > 0 || outcomes.unknown > 0) && (
+              <span
+                title="Original outcomes from the source test"
+                style={{ fontFamily: "'DM Mono', monospace" }}
+              >
+                {outcomes.correct > 0 && <span style={{ color: 'var(--success)' }}>✓ {outcomes.correct}</span>}
+                {outcomes.incorrect > 0 && <span style={{ color: 'var(--danger)', marginLeft: 6 }}>✗ {outcomes.incorrect}</span>}
+                {outcomes.skipped > 0 && <span style={{ marginLeft: 6 }}>— {outcomes.skipped}</span>}
+                {outcomes.unknown > 0 && <span style={{ marginLeft: 6 }}>? {outcomes.unknown}</span>}
+              </span>
+            )}
             {onDelete && (
               <button
                 onClick={handleDelete}
@@ -236,6 +257,16 @@ export function ChapterCard({ chapter, loaded, onLoad, stats, onMockClick, onDel
             </>
           )}
         </div>
+
+        {hasMistakes && onMistakesClick && (
+          <button
+            className="btn-secondary"
+            style={{ width: '100%', marginTop: 8 }}
+            onClick={() => onMistakesClick(chapter.id)}
+          >
+            Practice mistakes (✗ + —)
+          </button>
+        )}
       </div>
 
       <Dialog open={infoOpen} onOpenChange={setInfoOpen}>

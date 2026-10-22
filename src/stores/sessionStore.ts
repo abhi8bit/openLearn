@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { SessionStore, SessionConfig, ChapterData, LocalSession, LocalAnswer, SectionConfig } from '@/types'
 import { getDeviceId } from '@/lib/device'
 import { db } from '@/lib/dexie/db'
-import { saveSession, saveAnswer, markSessionInactive } from '@/lib/dexie/cache'
+import { saveSession, saveAnswer, markSessionInactive, recordSessionOutcomes } from '@/lib/dexie/cache'
 import { currentUserId } from '@/lib/session/sync'
 import { syncSession } from '@/lib/supabase/queries'
 
@@ -268,7 +268,7 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
   },
 
   submit: async () => {
-    const { sessionId } = get()
+    const { sessionId, questions, answers } = get()
     if (!sessionId) return
 
     try {
@@ -278,6 +278,18 @@ export const useSessionStore = create<SessionStore>((set, get) => ({
     }
 
     set({ isSubmitted: true })
+
+    try {
+      await recordSessionOutcomes({
+        sessionId,
+        userId: await currentUserId(),
+        deviceId: getDeviceId(),
+        questions,
+        answers,
+      })
+    } catch (e) {
+      console.error('[sessionStore] Failed to record question progress:', e)
+    }
   },
 
   persistTimeElapsed: (elapsedSecs: number) => {

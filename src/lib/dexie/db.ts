@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { Exam, Book, Chapter, ChapterData, LocalSession, LocalAnswer, LocalSavedQuestion } from '@/types'
+import type { Exam, Book, Chapter, ChapterData, LocalSession, LocalAnswer, LocalSavedQuestion, LocalQuestionProgress, LocalQuestionProgressEvent } from '@/types'
 
 export interface CachedImage {
   id: string            // full storage path: ${storagePrefix}/${filename}
@@ -17,6 +17,8 @@ class StudyDatabase extends Dexie {
   answers!: EntityTable<LocalAnswer, 'id'>
   savedQuestions!: EntityTable<LocalSavedQuestion, 'id'>
   imageCache!: EntityTable<CachedImage, 'id'>
+  questionProgress!: EntityTable<LocalQuestionProgress, 'id'>
+  questionProgressEvents!: EntityTable<LocalQuestionProgressEvent, 'id'>
 
   constructor() {
     super('SSCStudyDB_v3')
@@ -48,6 +50,11 @@ class StudyDatabase extends Dexie {
       sessions: 'id, [scopeId+sessionType], completedAt, scopeId',
       answers: 'id, sessionId, questionId, [sessionId+questionId]',
       savedQuestions: 'id, questionId',
+    })
+    // v6 — per-user question progress + idempotency ledger.
+    this.version(6).stores({
+      questionProgress: 'id, questionId, lastStatus, lastSeenAt',
+      questionProgressEvents: 'id, sessionId',
     })
   }
 }

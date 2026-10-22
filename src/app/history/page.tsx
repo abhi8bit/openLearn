@@ -13,6 +13,19 @@ interface EnrichedSession extends LocalSession {
   displayName: string
 }
 
+function mistakeFilterLabel(filters: string[]): string {
+  const labels: Record<string, string> = {
+    incorrect: 'Wrong',
+    skipped: 'Skipped',
+    correct: 'Correct',
+    unseen: 'Unseen',
+    all: 'All',
+    marked: 'Marked',
+  }
+  const names = filters.map((f) => labels[f] ?? f)
+  return names.length > 0 ? names.join(' + ') : 'Mistakes'
+}
+
 function timeAgo(timestamp: number): string {
   const diff = Date.now() - timestamp
   const mins = Math.floor(diff / 60000)
@@ -155,6 +168,11 @@ export default function HistoryPage() {
                       {s.sessionType === 'mock' && s.isSubmitted && (
                         <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, background: 'var(--success-subtle)', color: 'var(--success)', fontWeight: 500 }}>
                           Completed
+                        </span>
+                      )}
+                      {s.settings?.kind === 'mistakes' && (
+                        <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 99, background: 'var(--danger-subtle)', color: 'var(--danger)', fontWeight: 500 }}>
+                          Mistakes: {mistakeFilterLabel(s.settings.filters ?? (s.settings.filter ? [s.settings.filter] : []))}
                         </span>
                       )}
                     </div>

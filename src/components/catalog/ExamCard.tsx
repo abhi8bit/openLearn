@@ -10,9 +10,10 @@ interface ExamCardProps {
   questionCount?: number
   progressPercent?: number
   onMockClick?: (examId: string) => void
+  onMistakesClick?: (examId: string) => void
 }
 
-export function ExamCard({ exam, bookCount, chapterCount, questionCount, progressPercent = 0, onMockClick }: ExamCardProps) {
+export function ExamCard({ exam, bookCount, chapterCount, questionCount, progressPercent = 0, onMockClick, onMistakesClick }: ExamCardProps) {
   const comingSoon = exam.is_active === false
 
   return (
@@ -112,6 +113,19 @@ export function ExamCard({ exam, bookCount, chapterCount, questionCount, progres
                   }}
                 >
                   Mock Test
+                </button>
+              )}
+              {onMistakesClick && (
+                <button
+                  className="btn-secondary"
+                  style={{ fontSize: 12, padding: '0 12px' }}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    onMistakesClick(exam.id)
+                  }}
+                  title="Practice only your wrong and skipped questions"
+                >
+                  Mistakes
                 </button>
               )}
             </>

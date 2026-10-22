@@ -6,14 +6,16 @@ import { useRouter } from 'next/navigation'
 import { useCatalogStore } from '@/stores/catalogStore'
 import { ExamCard } from '@/components/catalog/ExamCard'
 import { MockSettingsModal, type SelectableItem } from '@/components/catalog/MockSettingsModal'
+import { PracticeFilterModal } from '@/components/catalog/PracticeFilterModal'
 import { ResumeBanner } from '@/components/shared/ResumeBanner'
 import { useSessionStore } from '@/stores/sessionStore'
 import { getQuestionIdsForChapters, getCachedBooks, getCachedChapters, getAllExamProgress, type ExamProgress } from '@/lib/dexie/cache'
 import { fetchBooksByExam, fetchChaptersByBook, fetchQuestionsByIds } from '@/lib/supabase/queries'
+import { startMistakesPractice } from '@/lib/session/practice'
 import { getExamConfigs, type ExamConfig } from '@/lib/exam-configs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AlertCircle, ArrowDown, Check, Github, Heart } from 'lucide-react'
-import type { SessionSettings, SectionConfig } from '@/types'
+import type { QuestionFilter, SessionSettings, SectionConfig } from '@/types'
 
 export default function HomePage() {
   const router = useRouter()
@@ -27,6 +29,10 @@ export default function HomePage() {
   const [hasLoaded, setHasLoaded] = useState(false)
   const [examProgressMap, setExamProgressMap] = useState<Record<string, ExamProgress>>({})
   const [activeCategory, setActiveCategory] = useState<string>('All')
+  const [mistakesExamId, setMistakesExamId] = useState<string | null>(null)
+  const [mistakesOpen, setMistakesOpen] = useState(false)
+  const [mistakeChapterIds, setMistakeChapterIds] = useState<string[]>([])
+  const [mistakeCounts, setMistakeCounts] = useState({ correct: 0, incorrect: 0, skipped: 0, unseen: 0, all: 0 })
   const examsRef = useRef<HTMLDivElement>(null)
 
   const scrollToExams = () => {
@@ -81,6 +87,50 @@ export default function HomePage() {
     if (exam) {
       setMockExamConfigs(getExamConfigs(exam.slug))
     }
+  }
+
+  async function handleExamMistakesClick(examId: string) {
+    setMistakesExamId(examId)
+    try {
+      let examBooks = await getCachedBooks(examId)
+      if (examBooks.length === 0) examBooks = await fetchBooksByExam(examId)
+
+      const chapterIds: string[] = []
+      const counts = { correct: 0, incorrect: 0, skipped: 0, unseen: 0, all: 0 }
+      for (const b of examBooks) {
+        let bookChapters = await getCachedChapters(b.id)
+        if (bookChapters.length === 0) bookChapters = await fetchChaptersByBook(b.id)
+        for (const c of bookChapters) {
+          chapterIds.push(c.id)
+          counts.correct += c.source_correct_count ?? 0
+          counts.incorrect += c.source_incorrect_count ?? 0
+          counts.skipped += c.source_skipped_count ?? 0
+          counts.unseen += c.source_unknown_count ?? 0
+          counts.all += c.question_count ?? 0
+        }
+      }
+      setMistakeChapterIds(chapterIds)
+      setMistakeCounts(counts)
+      setMistakesOpen(true)
+    } catch (e) {
+      console.error('[home] failed to load mistake counts:', e)
+      setMistakesExamId(null)
+    }
+  }
+
+  async function handleMistakesStart(filter: QuestionFilter, ids: string[], filters?: QuestionFilter[]) {
+    if (!mistakesExamId) return
+    await startMistakesPractice({
+      scope: 'exam',
+      examId: mistakesExamId,
+      bookId: null,
+      chapterId: null,
+      ids,
+      filter,
+      filters,
+      router,
+      initSession,
+    })
   }
 
   async function handleExamMockStart(settings: SessionSettings, selectedBookIds: string[], examConfig?: ExamConfig) {
@@ -501,6 +551,7 @@ export default function HomePage() {
                             questionCount={ep?.totalQuestions}
                             progressPercent={ep?.percent || 0}
                             onMockClick={handleExamMockClick}
+                            onMistakesClick={handleExamMistakesClick}
                           />
                         )
                       })}
@@ -511,6 +562,22 @@ export default function HomePage() {
             </>
           )}
         </div>
+
+        <PracticeFilterModal
+          open={mistakesOpen}
+          onOpenChange={(open) => {
+            setMistakesOpen(open)
+            if (!open) setMistakesExamId(null)
+          }}
+          scope="exam"
+          title={exams.find((e) => e.id === mistakesExamId)?.name ?? 'Exam'}
+          chapterIds={mistakeChapterIds}
+          examId={mistakesExamId ?? ''}
+          bookId={null}
+          chapterId={null}
+          counts={mistakeCounts}
+          onStart={handleMistakesStart}
+        />
 
         <MockSettingsModal
           open={mockSettingsOpen}

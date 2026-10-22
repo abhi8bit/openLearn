@@ -8,8 +8,10 @@ import {
   fetchUserSessions,
   fetchSessionAnswers,
   fetchSavedQuestions,
+  fetchQuestionProgress,
+  recordQuestionProgress,
 } from '@/lib/supabase/queries'
-import { rowToLocalSession, rowToLocalAnswer, rowToLocalSaved } from '@/lib/supabase/mappers'
+import { rowToLocalSession, rowToLocalAnswer, rowToLocalSaved, rowToLocalProgress } from '@/lib/supabase/mappers'
 
 let listenerSetup = false
 
@@ -67,9 +69,19 @@ async function runSyncFlow(userId: string): Promise<void> {
     console.error('[sync] syncPendingSaved failed:', e)
   }
   try {
+    await syncPendingProgress(userId)
+  } catch (e) {
+    console.error('[sync] syncPendingProgress failed:', e)
+  }
+  try {
     await pullUserData(userId)
   } catch (e) {
     console.error('[sync] pullUserData failed:', e)
+  }
+  try {
+    await pullQuestionProgress(userId)
+  } catch (e) {
+    console.error('[sync] pullQuestionProgress failed:', e)
   }
 }
 
@@ -106,6 +118,66 @@ async function migrateGuestData(userId: string): Promise<void> {
     .toArray()
   for (const record of guestSaved) {
     await db.savedQuestions.update(record.id, { userId, syncedAt: null })
+  }
+
+  // Claim guest progress rows. Re-key because the id embeds the owner;
+  // leaving the device-keyed id would create a duplicate row on the next write.
+  const guestProgress = await db.questionProgress
+    .filter((r) => r.deviceId === deviceId && r.userId === null)
+    .toArray()
+  for (const row of guestProgress) {
+    const nextId = `${userId}:${row.questionId}`
+    if (nextId !== row.id) await db.questionProgress.delete(row.id)
+    await db.questionProgress.put({ ...row, id: nextId, userId, syncedAt: null })
+  }
+}
+
+export async function syncPendingProgress(userId: string): Promise<void> {
+  const unsynced = await db.questionProgress
+    .filter((r) => r.userId === userId && r.syncedAt === null)
+    .toArray()
+  const bySession = new Map<string, typeof unsynced>()
+  for (const r of unsynced) {
+    if (!r.sessionId) continue // nothing to anchor the idempotency key to
+    const list = bySession.get(r.sessionId) ?? []
+    list.push(r)
+    bySession.set(r.sessionId, list)
+  }
+  for (const [sessionId, rows] of bySession) {
+    await recordQuestionProgress(
+      sessionId,
+      rows.map((r) => ({
+        question_id: r.questionId,
+        status: r.lastStatus,
+        device_id: r.deviceId,
+      })),
+    )
+    await db.questionProgress.bulkPut(
+      rows.map((r) => ({ ...r, syncedAt: Date.now() })),
+    )
+  }
+}
+
+/**
+ * Pull remote progress into Dexie. A local row with `syncedAt === null` has
+ * un-pushed changes and wins; everything else takes the remote copy.
+ */
+export async function pullQuestionProgress(userId: string): Promise<void> {
+  const remote = await fetchQuestionProgress(userId)
+  if (remote.length === 0) return
+  const now = Date.now()
+  const local = await db.questionProgress.bulkGet(remote.map((r) => `${r.user_id}:${r.question_id}`))
+  const localById = new Map(
+    local.filter((r) => r !== undefined).map((r) => [r!.id, r!]),
+  )
+  const toPut = remote
+    .filter((r) => {
+      const existing = localById.get(`${r.user_id}:${r.question_id}`)
+      return !existing || existing.syncedAt !== null
+    })
+    .map((r) => rowToLocalProgress(r, now))
+  if (toPut.length > 0) {
+    await db.questionProgress.bulkPut(toPut)
   }
 }
 

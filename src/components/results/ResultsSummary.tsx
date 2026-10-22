@@ -7,6 +7,7 @@ interface ResultsSummaryProps {
   answers: Record<string, LocalAnswer>
   sessionType: SessionType
   elapsedSecs: number
+  onPracticeMistakes?: (ids: string[]) => void
 }
 
 export function ResultsSummary({
@@ -14,6 +15,7 @@ export function ResultsSummary({
   answers,
   sessionType,
   elapsedSecs,
+  onPracticeMistakes,
 }: ResultsSummaryProps) {
   const total = questions.length
   const correct = questions.filter((q) => answers[q.id]?.isCorrect).length
@@ -25,6 +27,14 @@ export function ResultsSummary({
 
   const minutes = Math.floor(elapsedSecs / 60)
   const seconds = elapsedSecs % 60
+
+  // Wrong + unanswered in this attempt are the mistakes to re-practice.
+  const mistakeIds = questions
+    .filter((q) => {
+      const a = answers[q.id]
+      return !a?.selectedOption || !a.isCorrect
+    })
+    .map((q) => q.id)
 
   return (
     <div className="space-y-6">
@@ -61,6 +71,14 @@ export function ResultsSummary({
           </div>
         </div>
       </div>
+
+      {onPracticeMistakes && mistakeIds.length > 0 && (
+        <div>
+          <button className="btn-secondary" onClick={() => onPracticeMistakes(mistakeIds)}>
+            Practice this test&apos;s mistakes ({mistakeIds.length})
+          </button>
+        </div>
+      )}
     </div>
   )
 }

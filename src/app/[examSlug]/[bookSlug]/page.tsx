@@ -6,10 +6,12 @@ import Link from 'next/link'
 import { useCatalogStore } from '@/stores/catalogStore'
 import { ChapterCard } from '@/components/catalog/ChapterCard'
 import { MockSettingsModal } from '@/components/catalog/MockSettingsModal'
+import { PracticeFilterModal } from '@/components/catalog/PracticeFilterModal'
 import { useUIStore } from '@/stores/uiStore'
 import { useSessionStore } from '@/stores/sessionStore'
 import { getCachedOrFetchChapter, getChaptersStatus, deleteChapterCache, deleteAllChaptersCache } from '@/lib/dexie/cache'
-import type { ChapterStats } from '@/types'
+import { startMistakesPractice } from '@/lib/session/practice'
+import type { ChapterStats, QuestionFilter } from '@/types'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AlertCircle, Search, MoreHorizontal } from 'lucide-react'
 
@@ -33,6 +35,8 @@ export default function ChaptersPage() {
   const [loadAllActive, setLoadAllActive] = useState(false)
   const [loadAllProgress, setLoadAllProgress] = useState({ loaded: 0, total: 0 })
   const [deleteAllActive, setDeleteAllActive] = useState(false)
+  const [mistakesOpen, setMistakesOpen] = useState(false)
+  const [mistakeChapterId, setMistakeChapterId] = useState<string | null>(null)
 
   const exam = exams.find((e) => e.slug === examSlug)
   const book = books.find((b) => b.slug === bookSlug)
@@ -145,6 +149,56 @@ export default function ChaptersPage() {
     )
   })
 
+  const mistakeCounts = chapters.reduce(
+    (acc, c) => ({
+      correct: acc.correct + (c.source_correct_count ?? 0),
+      incorrect: acc.incorrect + (c.source_incorrect_count ?? 0),
+      skipped: acc.skipped + (c.source_skipped_count ?? 0),
+      unseen: acc.unseen + (c.source_unknown_count ?? 0),
+      all: acc.all + (c.question_count ?? 0),
+    }),
+    { correct: 0, incorrect: 0, skipped: 0, unseen: 0, all: 0 },
+  )
+
+  const mistakeChapter = mistakeChapterId ? chapters.find((c) => c.id === mistakeChapterId) ?? null : null
+  const mistakeChapterCounts = mistakeChapter
+    ? {
+        correct: mistakeChapter.source_correct_count ?? 0,
+        incorrect: mistakeChapter.source_incorrect_count ?? 0,
+        skipped: mistakeChapter.source_skipped_count ?? 0,
+        unseen: mistakeChapter.source_unknown_count ?? 0,
+        all: mistakeChapter.question_count ?? 0,
+      }
+    : { correct: 0, incorrect: 0, skipped: 0, unseen: 0, all: 0 }
+
+  async function handleChapterMistakesStart(filter: QuestionFilter, ids: string[], filters?: QuestionFilter[]) {
+    await startMistakesPractice({
+      scope: 'chapter',
+      examId: exam?.id ?? '',
+      bookId: book?.id ?? null,
+      chapterId: mistakeChapterId,
+      ids,
+      filter,
+      filters,
+      router,
+      initSession,
+    })
+  }
+
+  async function handleMistakesStart(filter: QuestionFilter, ids: string[], filters?: QuestionFilter[]) {
+    await startMistakesPractice({
+      scope: 'book',
+      examId: exam?.id ?? '',
+      bookId: book?.id ?? null,
+      chapterId: null,
+      ids,
+      filter,
+      filters,
+      router,
+      initSession,
+    })
+  }
+
   async function handleMockStart(settings: import('@/types').SessionSettings, _selectedItemIds: string[]) {
     if (!pendingChapter) return
     const chapter = chapters.find((c) => c.id === pendingChapter)
@@ -205,6 +259,16 @@ export default function ChaptersPage() {
           <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.5px', color: 'var(--text-primary)' }}>
             {book?.name ?? bookSlug}
           </h1>
+
+          {!isLoading && chapters.length > 0 && mistakeCounts.incorrect + mistakeCounts.skipped > 0 && (
+            <button
+              className="btn-secondary"
+              style={{ marginLeft: 'auto', fontSize: 13 }}
+              onClick={() => setMistakesOpen(true)}
+            >
+              Practice mistakes
+            </button>
+          )}
 
           {/* Three-dot menu */}
           {!isLoading && chapters.length > 0 && (
@@ -386,6 +450,7 @@ export default function ChaptersPage() {
                         setPendingChapter(id)
                         setMockSettingsOpen(true)
                       }}
+                      onMistakesClick={setMistakeChapterId}
                     />
                   )
                 })}
@@ -393,6 +458,32 @@ export default function ChaptersPage() {
             )}
           </>
         )}
+
+        <PracticeFilterModal
+          open={mistakeChapterId !== null}
+          onOpenChange={(open) => { if (!open) setMistakeChapterId(null) }}
+          scope="chapter"
+          title={mistakeChapter?.name ?? 'Chapter'}
+          chapterIds={mistakeChapterId ? [mistakeChapterId] : []}
+          examId={exam?.id ?? ''}
+          bookId={book?.id ?? null}
+          chapterId={mistakeChapterId}
+          counts={mistakeChapterCounts}
+          onStart={handleChapterMistakesStart}
+        />
+
+        <PracticeFilterModal
+          open={mistakesOpen}
+          onOpenChange={setMistakesOpen}
+          scope="book"
+          title={book?.name ?? bookSlug}
+          chapterIds={chapters.map((c) => c.id)}
+          examId={exam?.id ?? ''}
+          bookId={book?.id ?? null}
+          chapterId={null}
+          counts={mistakeCounts}
+          onStart={handleMistakesStart}
+        />
 
         <MockSettingsModal
           open={isMockSettingsOpen}

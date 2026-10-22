@@ -9,7 +9,8 @@ import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { useSessionStore } from '@/stores/sessionStore'
 import { useSavedStore } from '@/stores/savedStore'
 import { useUIStore } from '@/stores/uiStore'
-import { saveAnswer, saveSession, getSession, markSessionInactive, getCachedOrFetchChapter, getPracticeSession, getPreviousPracticeSessions, getStoragePrefix } from '@/lib/dexie/cache'
+import { saveAnswer, saveSession, getSession, markSessionInactive, getCachedOrFetchChapter, getPracticeSession, getPreviousPracticeSessions, getStoragePrefix, recordSessionOutcomes } from '@/lib/dexie/cache'
+import { getDeviceId } from '@/lib/device'
 import { createTimerWorker } from '@/lib/session/createTimerWorker'
 import { db } from '@/lib/dexie/db'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
@@ -474,6 +475,13 @@ export function SessionLayout() {
       completedAt: Date.now(),
       answeredCount,
       correctCount,
+    })
+    await recordSessionOutcomes({
+      sessionId,
+      userId: await currentUserId(),
+      deviceId: getDeviceId(),
+      questions,
+      answers: useSessionStore.getState().answers,
     })
     setIsPracticeCompleted(true)
     router.back()

@@ -14,6 +14,21 @@ export type UserSessionRow = Database['public']['Tables']['user_sessions']['Row'
 export type SessionAnswerRow = Database['public']['Tables']['session_answers']['Row']
 export type SavedQuestionRow = Database['public']['Tables']['saved_questions']['Row']
 
+// Per-user question progress (Supabase mirrors + app-level filters)
+export type QuestionProgressRow = Database['public']['Tables']['question_progress']['Row']
+export type QuestionProgressEventRow = Database['public']['Tables']['question_progress_events']['Row']
+
+export type SourceStatus = 'correct' | 'incorrect' | 'skipped' | 'unknown'
+export type ProgressStatus = 'correct' | 'incorrect' | 'skipped'
+
+export type QuestionFilter =
+  | 'all'
+  | 'incorrect'
+  | 'skipped'
+  | 'correct'
+  | 'unseen'
+  | 'marked'
+
 // ── Problem Reports (public feedback channel) ──
 export type ProblemReportRow = Database['public']['Tables']['problem_reports']['Row']
 
@@ -81,6 +96,9 @@ export interface SessionSettings {
   sectionQuestionRanges?: Array<{ start: number; end: number }>
   currentSectionIndex?: number
   sectionTimeLimits?: number[]       // per-section time in seconds
+  filter?: QuestionFilter
+  filters?: QuestionFilter[]         // combined mistake filters (wrong + skipped)
+  kind?: 'mistakes'
 }
 
 export interface SessionConfig {
@@ -186,6 +204,29 @@ export interface LocalSavedQuestion {
   deviceId: string | null
   questionId: string
   syncedAt: number | null
+}
+
+export interface LocalQuestionProgress {
+  id: string                    // `${userId ?? deviceId}:${questionId}`
+  userId: string | null
+  deviceId: string | null
+  sessionId?: string | null     // last session that produced this row (guest backfill)
+  questionId: string
+  attempts: number
+  correctCount: number
+  incorrectCount: number
+  skippedCount: number
+  lastStatus: ProgressStatus
+  lastSeenAt: number
+  syncedAt: number | null
+}
+
+export interface LocalQuestionProgressEvent {
+  id: string                    // `${sessionId}:${questionId}`
+  sessionId: string
+  questionId: string
+  status: ProgressStatus
+  createdAt: number
 }
 
 // ── Chapter Stats ──

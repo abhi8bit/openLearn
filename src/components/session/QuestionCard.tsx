@@ -2,7 +2,16 @@
 
 import { KaTeXRenderer } from '@/components/shared/KaTeXRenderer'
 import { TextWithInlineImages } from '@/components/shared/TextWithInlineImages'
-import type { Concept, Question, Option, LocalAnswer } from '@/types'
+import type { Concept, Question, Option, LocalAnswer, SourceStatus } from '@/types'
+
+function sourceStatusLabel(status: SourceStatus): string {
+  switch (status) {
+    case 'correct': return 'Correct'
+    case 'incorrect': return 'Wrong'
+    case 'skipped': return 'Skipped'
+    case 'unknown': return 'Unknown'
+  }
+}
 
 interface QuestionCardProps {
   isConcept: boolean
@@ -69,6 +78,33 @@ export function QuestionCard({
           Q{questionNum}
         </span>
       </div>
+
+      {(question.source_status || question.question_source) && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {question.source_status && (
+            <span
+              style={{
+                fontSize: 11,
+                padding: '2px 8px',
+                borderRadius: 99,
+                border: '1px solid var(--border-medium)',
+                color: question.source_status === 'correct'
+                  ? 'var(--success)'
+                  : question.source_status === 'incorrect'
+                    ? 'var(--danger)'
+                    : 'var(--text-tertiary)',
+              }}
+            >
+              Originally: {sourceStatusLabel(question.source_status)}
+            </span>
+          )}
+          {question.question_source && (
+            <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+              {question.question_source}
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Question text — images rendered inline where markdown appears */}
       {question.question_text && (

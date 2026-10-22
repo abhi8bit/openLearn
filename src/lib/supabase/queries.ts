@@ -1,5 +1,6 @@
 import { createClient } from './client'
-import type { Exam, Book, Chapter, Concept, QuestionRow, Option, Solution, LocalSession, LocalAnswer, UserSessionRow, SessionAnswerRow, SavedQuestionRow, ProblemReportInsert } from '@/types'
+import type { Json } from '@/../database.types'
+import type { Exam, Book, Chapter, Concept, QuestionRow, Option, Solution, LocalSession, LocalAnswer, UserSessionRow, SessionAnswerRow, SavedQuestionRow, ProblemReportInsert, SourceStatus, ProgressStatus, QuestionProgressRow } from '@/types'
 
 // ── Catalog Queries ──
 
@@ -193,27 +194,38 @@ export async function fetchFullChapter(chapterId: string): Promise<RawChapterDat
 export interface QuestionIdResult {
   id: string
   chapter_id: string
+  source_status: SourceStatus | null
 }
 
 export async function fetchQuestionIdsByChapters(
-  chapterIds: string[]
+  chapterIds: string[],
+  opts: { statuses?: SourceStatus[] } = {},
 ): Promise<QuestionIdResult[]> {
   if (chapterIds.length === 0) return []
   const supabase = createClient()
+  const PAGE = 1000
+  const BATCH = 50
+  const out: QuestionIdResult[] = []
 
-  const BATCH_SIZE = 50
-  const batches: QuestionIdResult[][] = []
-  for (let i = 0; i < chapterIds.length; i += BATCH_SIZE) {
-    const batch = chapterIds.slice(i, i + BATCH_SIZE)
-    const res = await supabase
-      .from('questions')
-      .select('id, chapter_id')
-      .in('chapter_id', batch)
-      .order('question_number')
-    if (res.error) throw res.error
-    batches.push((res.data ?? []) as QuestionIdResult[])
+  for (let i = 0; i < chapterIds.length; i += BATCH) {
+    const batch = chapterIds.slice(i, i + BATCH)
+    let from = 0
+    for (;;) {
+      let query = supabase
+        .from('questions')
+        .select('id, chapter_id, source_status')
+        .in('chapter_id', batch)
+        .order('id')
+        .range(from, from + PAGE - 1)
+      if (opts.statuses?.length) query = query.in('source_status', opts.statuses)
+      const { data, error } = await query
+      if (error) throw error
+      out.push(...((data ?? []) as QuestionIdResult[]))
+      if (!data || data.length < PAGE) break
+      from += PAGE
+    }
   }
-  return batches.flat()
+  return out
 }
 
 export async function fetchQuestionsByIds(
@@ -356,6 +368,41 @@ export async function unsyncSavedQuestion(
   }
   const { error } = await query
   if (error) console.error('unsyncSavedQuestion failed:', error)
+}
+
+// ── Question Progress ──
+
+export async function fetchQuestionProgress(userId: string): Promise<QuestionProgressRow[]> {
+  const supabase = createClient()
+  const PAGE = 1000
+  const out: QuestionProgressRow[] = []
+  let from = 0
+  for (;;) {
+    const { data, error } = await supabase
+      .from('question_progress')
+      .select('*')
+      .eq('user_id', userId)
+      .order('question_id')
+      .range(from, from + PAGE - 1)
+    if (error) throw error
+    out.push(...((data ?? []) as QuestionProgressRow[]))
+    if (!data || data.length < PAGE) break
+    from += PAGE
+  }
+  return out
+}
+
+export async function recordQuestionProgress(
+  sessionId: string,
+  rows: Array<{ question_id: string; status: ProgressStatus; device_id?: string | null }>,
+): Promise<void> {
+  if (rows.length === 0) return
+  const supabase = createClient()
+  const { error } = await supabase.rpc('record_question_progress', {
+    p_session_id: sessionId,
+    p_rows: rows as unknown as Json,
+  })
+  if (error) throw error
 }
 
 // ── Guest Migration ──

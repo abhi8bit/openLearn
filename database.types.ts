@@ -116,6 +116,10 @@ export type Database = {
           page_start: number | null
           question_count: number | null
           slug: string
+          source_correct_count: number
+          source_incorrect_count: number
+          source_skipped_count: number
+          source_unknown_count: number
           storage_prefix: string | null
           updated_at: string | null
         }
@@ -135,6 +139,10 @@ export type Database = {
           page_start?: number | null
           question_count?: number | null
           slug: string
+          source_correct_count?: number
+          source_incorrect_count?: number
+          source_skipped_count?: number
+          source_unknown_count?: number
           storage_prefix?: string | null
           updated_at?: string | null
         }
@@ -154,6 +162,10 @@ export type Database = {
           page_start?: number | null
           question_count?: number | null
           slug?: string
+          source_correct_count?: number
+          source_incorrect_count?: number
+          source_skipped_count?: number
+          source_unknown_count?: number
           storage_prefix?: string | null
           updated_at?: string | null
         }
@@ -286,6 +298,91 @@ export type Database = {
           },
         ]
       }
+      question_progress: {
+        Row: {
+          attempts: number
+          correct_count: number
+          created_at: string
+          device_id: string | null
+          id: string
+          incorrect_count: number
+          last_seen_at: string
+          last_status: string
+          question_id: string
+          skipped_count: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          attempts?: number
+          correct_count?: number
+          created_at?: string
+          device_id?: string | null
+          id?: string
+          incorrect_count?: number
+          last_seen_at?: string
+          last_status: string
+          question_id: string
+          skipped_count?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          attempts?: number
+          correct_count?: number
+          created_at?: string
+          device_id?: string | null
+          id?: string
+          incorrect_count?: number
+          last_seen_at?: string
+          last_status?: string
+          question_id?: string
+          skipped_count?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "question_progress_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      question_progress_events: {
+        Row: {
+          created_at: string
+          question_id: string
+          session_id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          question_id: string
+          session_id: string
+          status: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          question_id?: string
+          session_id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "question_progress_events_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       question_options: {
         Row: {
           created_at: string | null
@@ -376,6 +473,12 @@ export type Database = {
           question_page: number | null
           question_source: string | null
           question_text: string | null
+          source_platform: string | null
+          source_qid: string | null
+          source_status: 'correct' | 'incorrect' | 'skipped' | 'unknown' | null
+          source_test_id: string | null
+          source_test_title: string | null
+          source_time_secs: number | null
           updated_at: string | null
         }
         Insert: {
@@ -388,6 +491,12 @@ export type Database = {
           question_page?: number | null
           question_source?: string | null
           question_text?: string | null
+          source_platform?: string | null
+          source_qid?: string | null
+          source_status?: 'correct' | 'incorrect' | 'skipped' | 'unknown' | null
+          source_test_id?: string | null
+          source_test_title?: string | null
+          source_time_secs?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -400,6 +509,12 @@ export type Database = {
           question_page?: number | null
           question_source?: string | null
           question_text?: string | null
+          source_platform?: string | null
+          source_qid?: string | null
+          source_status?: 'correct' | 'incorrect' | 'skipped' | 'unknown' | null
+          source_test_id?: string | null
+          source_test_title?: string | null
+          source_time_secs?: number | null
           updated_at?: string | null
         }
         Relationships: [
@@ -578,7 +693,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      record_question_progress: {
+        Args: { p_session_id: string; p_rows: Json }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

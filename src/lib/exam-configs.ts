@@ -24,6 +24,53 @@ export interface ExamConfig {
 
 const examConfigs: ExamConfig[] = [
   {
+    examSlug: 'ssc-cgl-pre-2026-attempted-mock-tests',
+    label: 'SSC CGL Pre 2026 — Attempted Mocks',
+    shuffle: true,
+    sections: [
+      {
+        slug: 'quant',
+        label: 'Quantitative Aptitude',
+        bookSlugs: ['cgl-pre2026-attempted-quant'],
+        questionCount: 25,
+        timeLimitMinutes: 15,
+        marksPerCorrect: 2,
+        marksPerWrong: -0.5,
+        totalMarks: 50,
+      },
+      {
+        slug: 'reasoning',
+        label: 'Reasoning & General Intelligence',
+        bookSlugs: ['cgl-pre2026-attempted-reasoning'],
+        questionCount: 25,
+        timeLimitMinutes: 15,
+        marksPerCorrect: 2,
+        marksPerWrong: -0.5,
+        totalMarks: 50,
+      },
+      {
+        slug: 'english',
+        label: 'English Language & Comprehension',
+        bookSlugs: ['cgl-pre2026-attempted-english'],
+        questionCount: 25,
+        timeLimitMinutes: 15,
+        marksPerCorrect: 2,
+        marksPerWrong: -0.5,
+        totalMarks: 50,
+      },
+      {
+        slug: 'ga',
+        label: 'General Awareness',
+        bookSlugs: ['cgl-pre2026-attempted-ga'],
+        questionCount: 25,
+        timeLimitMinutes: 15,
+        marksPerCorrect: 2,
+        marksPerWrong: -0.5,
+        totalMarks: 50,
+      },
+    ],
+  },
+  {
     examSlug: 'ssc-cgl',
     label: 'SSC CGL Tier 1',
     shuffle: true,

@@ -1,7 +1,20 @@
 import { db } from './db'
-import { fetchFullChapter, fetchQuestionIdsByChapters } from '@/lib/supabase/queries'
+import { fetchFullChapter, fetchQuestionIdsByChapters, recordQuestionProgress } from '@/lib/supabase/queries'
 import { createClient } from '@/lib/supabase/client'
-import type { Exam, Book, Chapter, ChapterData, ChapterStats, LocalSession, LocalAnswer, LocalSavedQuestion } from '@/types'
+import type {
+  Exam,
+  Book,
+  Chapter,
+  ChapterData,
+  ChapterStats,
+  LocalSession,
+  LocalAnswer,
+  LocalSavedQuestion,
+  LocalQuestionProgress,
+  LocalQuestionProgressEvent,
+  ProgressStatus,
+  SourceStatus,
+} from '@/types'
 
 // ── Image Cache ──
 
@@ -151,6 +164,7 @@ export async function getCachedOrFetchChapter(chapterId: string): Promise<Chapte
 interface QuestionIdResult {
   id: string
   chapterId: string
+  sourceStatus: SourceStatus | null
 }
 
 export async function getQuestionIdsForChapters(
@@ -170,7 +184,7 @@ export async function getQuestionIdsForChapters(
     const meta = chapterMetaMap.get(chapterId)
     if (cached && cached.contentVersion === (meta?.content_version ?? null)) {
       for (const q of cached.questions) {
-        results.push({ id: q.id, chapterId })
+        results.push({ id: q.id, chapterId, sourceStatus: q.source_status ?? null })
       }
     } else {
       uncachedChapterIds.push(chapterId)
@@ -180,11 +194,105 @@ export async function getQuestionIdsForChapters(
   if (uncachedChapterIds.length > 0) {
     const fetched = await fetchQuestionIdsByChapters(uncachedChapterIds)
     for (const row of fetched) {
-      results.push({ id: row.id, chapterId: row.chapter_id })
+      results.push({ id: row.id, chapterId: row.chapter_id, sourceStatus: row.source_status ?? null })
     }
   }
 
   return results
+}
+
+// ── Question Progress (right/wrong tracking) ──
+
+export async function getLocalProgressMap(
+  userId: string | null,
+  deviceId: string,
+): Promise<Map<string, LocalQuestionProgress>> {
+  const rows = await db.questionProgress.toArray()
+  const map = new Map<string, LocalQuestionProgress>()
+  for (const r of rows) {
+    const mine = userId ? r.userId === userId : r.userId === null && r.deviceId === deviceId
+    if (mine) map.set(r.questionId, r)
+  }
+  return map
+}
+
+/**
+ * Record the outcomes of a completed session: Dexie first, then a
+ * fire-and-forget RPC when logged in. Idempotent per (session, question) both
+ * locally (event ledger) and server-side, so re-submitting is a no-op.
+ */
+export async function recordSessionOutcomes(args: {
+  sessionId: string
+  userId: string | null
+  deviceId: string
+  questions: Array<{ id: string }>
+  answers: Record<string, LocalAnswer>
+}): Promise<void> {
+  const { sessionId, userId, deviceId, questions, answers } = args
+  const ids = questions.map((q) => q.id)
+  if (ids.length === 0) return
+
+  const now = Date.now()
+  let puts: LocalQuestionProgress[] = []
+  const rpcRows: Array<{ question_id: string; status: ProgressStatus; device_id: string }> = []
+
+  // One atomic read-modify-write so concurrent submissions (double-click,
+  // retry) cannot both observe an empty event ledger and double-count.
+  await db.transaction('rw', db.questionProgress, db.questionProgressEvents, async () => {
+    const existing = await db.questionProgress.bulkGet(ids.map((qid) => `${userId ?? deviceId}:${qid}`))
+    const byId = new Map(existing.filter((r) => r !== undefined).map((r) => [r!.questionId, r!]))
+    const eventIds = ids.map((qid) => `${sessionId}:${qid}`)
+    const events = await db.questionProgressEvents.bulkGet(eventIds)
+    const alreadyRecorded = new Set(events.filter((e) => e !== undefined).map((e) => e!.questionId))
+    const newEvents: LocalQuestionProgressEvent[] = []
+    const updated: LocalQuestionProgress[] = []
+
+    for (const qid of ids) {
+      // Re-submitting the same session must not double-count locally either.
+      if (alreadyRecorded.has(qid)) continue
+      const a = answers[qid]
+      const status: ProgressStatus =
+        a?.selectedOption != null ? (a.isCorrect ? 'correct' : 'incorrect') : 'skipped'
+      const prev = byId.get(qid)
+      const row: LocalQuestionProgress = {
+        id: `${userId ?? deviceId}:${qid}`,
+        userId,
+        deviceId,
+        sessionId,
+        questionId: qid,
+        attempts: (prev?.attempts ?? 0) + 1,
+        correctCount: (prev?.correctCount ?? 0) + (status === 'correct' ? 1 : 0),
+        incorrectCount: (prev?.incorrectCount ?? 0) + (status === 'incorrect' ? 1 : 0),
+        skippedCount: (prev?.skippedCount ?? 0) + (status === 'skipped' ? 1 : 0),
+        lastStatus: status,
+        lastSeenAt: now,
+        syncedAt: userId ? null : now,
+      }
+      updated.push(row)
+      newEvents.push({
+        id: `${sessionId}:${qid}`,
+        sessionId,
+        questionId: qid,
+        status,
+        createdAt: now,
+      })
+      rpcRows.push({ question_id: qid, status, device_id: deviceId })
+    }
+
+    if (newEvents.length > 0) {
+      await db.questionProgressEvents.bulkPut(newEvents)
+      await db.questionProgress.bulkPut(updated)
+    }
+    puts = updated
+  })
+
+  if (puts.length === 0) return
+
+  if (userId) {
+    recordQuestionProgress(sessionId, rpcRows)
+      .then(() => db.questionProgress.bulkPut(puts.map((r) => ({ ...r, syncedAt: Date.now() }))))
+      .catch((e) => console.error('[progress] push failed:', e))
+  }
 }
 
 export interface ChapterStatus {

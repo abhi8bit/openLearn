@@ -2,9 +2,12 @@ import type {
   UserSessionRow,
   SessionAnswerRow,
   SavedQuestionRow,
+  QuestionProgressRow,
   LocalSession,
   LocalAnswer,
   LocalSavedQuestion,
+  LocalQuestionProgress,
+  ProgressStatus,
   Scope,
   SessionType,
   SessionSettings,
@@ -66,6 +69,25 @@ export function rowToLocalSaved(r: SavedQuestionRow, syncedAt: number): LocalSav
     userId: r.user_id,
     deviceId: r.device_id,
     questionId: r.question_id,
+    syncedAt,
+  }
+}
+
+export function rowToLocalProgress(
+  r: QuestionProgressRow,
+  syncedAt: number,
+): LocalQuestionProgress {
+  return {
+    id: `${r.user_id}:${r.question_id}`,
+    userId: r.user_id,
+    deviceId: r.device_id,
+    questionId: r.question_id,
+    attempts: r.attempts,
+    correctCount: r.correct_count,
+    incorrectCount: r.incorrect_count,
+    skippedCount: r.skipped_count,
+    lastStatus: r.last_status as ProgressStatus,
+    lastSeenAt: Date.parse(r.last_seen_at),
     syncedAt,
   }
 }
