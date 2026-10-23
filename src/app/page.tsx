@@ -58,9 +58,13 @@ export default function HomePage() {
   const showEmpty = hasLoaded && !isLoading && !error && exams.length === 0
 
   const UNCATEGORIZED = 'Other'
+  // Available exams first, coming-soon last; stable sort keeps display_order within each group
+  const orderedExams = [...exams].sort(
+    (a, b) => Number(a.is_active === false) - Number(b.is_active === false)
+  )
   // Unique category names in display order (exams already ordered by display_order)
   const categories = Array.from(
-    new Set(exams.map((e) => e.category_name?.trim() || UNCATEGORIZED))
+    new Set(orderedExams.map((e) => e.category_name?.trim() || UNCATEGORIZED))
   )
   const visibleCategories =
     activeCategory === 'All' ? categories : categories.filter((c) => c === activeCategory)
@@ -527,7 +531,7 @@ export default function HomePage() {
 
               {/* Categorized exam sections */}
               {visibleCategories.map((cat) => {
-                const catExams = exams.filter(
+                const catExams = orderedExams.filter(
                   (e) => (e.category_name?.trim() || UNCATEGORIZED) === cat
                 )
                 if (catExams.length === 0) return null

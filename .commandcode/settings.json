@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "powershell",
+      "Shell(dir:*)",
+      "Shell(npm:*)",
+      "Shell(del:*)",
+      "Shell(dir /b supabase\\.temp 2>nul & echo --- & type supabase\\.temp\\project-ref 2>nul)",
+      "Shell(type:*)"
+    ],
+    "deny": [],
+    "defaultMode": "default"
+  }
+}
