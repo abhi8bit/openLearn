@@ -2,6 +2,8 @@
 
 import { KaTeXRenderer } from '@/components/shared/KaTeXRenderer'
 import { TextWithInlineImages } from '@/components/shared/TextWithInlineImages'
+import { useLanguageStore } from '@/stores/languageStore'
+import { questionText, optionText, solutionText } from '@/lib/i18n/question'
 import type { Concept, Question, Option, LocalAnswer, SourceStatus } from '@/types'
 
 function sourceStatusLabel(status: SourceStatus): string {
@@ -32,6 +34,8 @@ export function QuestionCard({
   showSolution,
   onSelectOption,
 }: QuestionCardProps) {
+  const language = useLanguageStore((s) => s.language)
+
   if (isConcept && concept) {
     return (
       <div className="space-y-4">
@@ -49,6 +53,8 @@ export function QuestionCard({
 
   if (!question) return null
 
+  const qText = questionText(question, language)
+  const solText = solutionText(question, language)
   const questionNum = question.question_number ?? ''
   const selectedOptionId = answer?.selectedOption ?? null
   const isAnswerCorrect = answer?.isCorrect ?? null
@@ -107,10 +113,10 @@ export function QuestionCard({
       )}
 
       {/* Question text — images rendered inline where markdown appears */}
-      {question.question_text && (
+      {qText && (
         <div style={{ marginTop: 4, fontSize: 16, color: 'var(--text-primary)' }}>
           <TextWithInlineImages
-            text={question.question_text}
+            text={qText}
             storagePrefix={storagePrefix ?? undefined}
           />
         </div>
@@ -160,7 +166,7 @@ export function QuestionCard({
               </span>
               <div style={{ flex: 1 }}>
                 <TextWithInlineImages
-                  text={opt.option_text ?? ''}
+                  text={optionText(opt, language)}
                   storagePrefix={storagePrefix ?? undefined}
                 />
               </div>
@@ -173,10 +179,10 @@ export function QuestionCard({
       {showSolution && question.solution && (
         <div className="solution-box">
           <h4>Solution</h4>
-          {question.solution.solution_text && (
+          {solText && (
             <div style={{ fontSize: 14, color: 'var(--text-primary)' }}>
               <TextWithInlineImages
-                text={question.solution.solution_text}
+                text={solText}
                 storagePrefix={storagePrefix ?? undefined}
               />
             </div>

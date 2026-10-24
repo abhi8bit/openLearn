@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { AuthProvider } from '@/components/shared/AuthProvider'
 import { CatalogSyncProvider } from '@/components/shared/CatalogSyncProvider'
 import { AppHeader } from '@/components/shared/AppHeader'
+import { LanguageProvider } from '@/components/shared/LanguageProvider'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -40,6 +41,7 @@ export default function RootLayout({
       <body className="font-sans antialiased">
         <AuthProvider>
           <CatalogSyncProvider />
+          <LanguageProvider />
           <AppHeader />
           {children}
         </AuthProvider>

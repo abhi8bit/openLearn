@@ -391,6 +391,7 @@ export type Database = {
           is_correct: boolean | null
           option_label: string
           option_text: string | null
+          option_text_hi: string | null
           question_id: string
           updated_at: string | null
         }
@@ -401,6 +402,7 @@ export type Database = {
           is_correct?: boolean | null
           option_label: string
           option_text?: string | null
+          option_text_hi?: string | null
           question_id: string
           updated_at?: string | null
         }
@@ -411,6 +413,7 @@ export type Database = {
           is_correct?: boolean | null
           option_label?: string
           option_text?: string | null
+          option_text_hi?: string | null
           question_id?: string
           updated_at?: string | null
         }
@@ -432,6 +435,7 @@ export type Database = {
           question_id: string
           solution_page: number | null
           solution_text: string | null
+          solution_text_hi: string | null
           updated_at: string | null
         }
         Insert: {
@@ -441,6 +445,7 @@ export type Database = {
           question_id: string
           solution_page?: number | null
           solution_text?: string | null
+          solution_text_hi?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -450,6 +455,7 @@ export type Database = {
           question_id?: string
           solution_page?: number | null
           solution_text?: string | null
+          solution_text_hi?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -473,6 +479,7 @@ export type Database = {
           question_page: number | null
           question_source: string | null
           question_text: string | null
+          question_text_hi: string | null
           source_platform: string | null
           source_qid: string | null
           source_status: 'correct' | 'incorrect' | 'skipped' | 'unknown' | null
@@ -491,6 +498,7 @@ export type Database = {
           question_page?: number | null
           question_source?: string | null
           question_text?: string | null
+          question_text_hi?: string | null
           source_platform?: string | null
           source_qid?: string | null
           source_status?: 'correct' | 'incorrect' | 'skipped' | 'unknown' | null
@@ -509,6 +517,7 @@ export type Database = {
           question_page?: number | null
           question_source?: string | null
           question_text?: string | null
+          question_text_hi?: string | null
           source_platform?: string | null
           source_qid?: string | null
           source_status?: 'correct' | 'incorrect' | 'skipped' | 'unknown' | null

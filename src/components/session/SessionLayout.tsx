@@ -6,6 +6,8 @@ import { QuestionCard } from './QuestionCard'
 import { RightPanel } from './RightPanel'
 import { ReportProblemModal } from './ReportProblemModal'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { LanguageToggle } from '@/components/ui/LanguageToggle'
+import { hasHindiText } from '@/lib/i18n/question'
 import { useSessionStore } from '@/stores/sessionStore'
 import { useSavedStore } from '@/stores/savedStore'
 import { useUIStore } from '@/stores/uiStore'
@@ -564,6 +566,9 @@ export function SessionLayout() {
     setSwipeOffset(0)
   }, [isConcept, swipeOffset, handleNavigate, currentIndex])
 
+  // Show the language toggle only when this question set has real Hindi text
+  const showLanguageToggle = useMemo(() => questions.some(hasHindiText), [questions])
+
   // Stats for stats dialog
   const stats = useMemo(() => {
     const total = questions.length
@@ -729,6 +734,8 @@ export function SessionLayout() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {showLanguageToggle && <LanguageToggle />}
+
           <button
             onClick={() => setShowReportDialog(true)}
             title="Report a problem"

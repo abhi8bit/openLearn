@@ -2,6 +2,8 @@
 
 import { KaTeXRenderer } from '@/components/shared/KaTeXRenderer'
 import { TextWithInlineImages } from '@/components/shared/TextWithInlineImages'
+import { useLanguageStore } from '@/stores/languageStore'
+import { questionText, optionText, solutionText } from '@/lib/i18n/question'
 import type { Question, LocalAnswer, SourceStatus } from '@/types'
 
 function sourceStatusLabel(status: SourceStatus): string {
@@ -26,6 +28,9 @@ export function QuestionReview({
   storagePrefix,
   showSolution = true,
 }: QuestionReviewProps) {
+  const language = useLanguageStore((s) => s.language)
+  const qText = questionText(question, language)
+  const solText = solutionText(question, language)
   const selectedOptionId = answer?.selectedOption ?? null
   const isCorrect = answer?.isCorrect ?? null
 
@@ -90,10 +95,10 @@ export function QuestionReview({
       )}
 
       {/* Question text — images rendered inline */}
-      {question.question_text && (
+      {qText && (
         <div style={{ fontSize: 14, color: 'var(--text-primary)' }}>
           <TextWithInlineImages
-            text={question.question_text}
+            text={qText}
             storagePrefix={storagePrefix ?? undefined}
           />
         </div>
@@ -129,7 +134,7 @@ export function QuestionReview({
               </span>
               <div style={{ flex: 1 }}>
                 <TextWithInlineImages
-                  text={opt.option_text ?? ''}
+                  text={optionText(opt, language)}
                   storagePrefix={storagePrefix ?? undefined}
                 />
               </div>
@@ -143,10 +148,10 @@ export function QuestionReview({
       {showSolution && question.solution && (
         <div className="solution-box">
           <h4>Solution</h4>
-          {question.solution.solution_text && (
+          {solText && (
             <div style={{ fontSize: 14, color: 'var(--text-primary)' }}>
               <TextWithInlineImages
-                text={question.solution.solution_text}
+                text={solText}
                 storagePrefix={storagePrefix ?? undefined}
               />
             </div>

@@ -18,6 +18,8 @@ export type SavedQuestionRow = Database['public']['Tables']['saved_questions']['
 export type QuestionProgressRow = Database['public']['Tables']['question_progress']['Row']
 export type QuestionProgressEventRow = Database['public']['Tables']['question_progress_events']['Row']
 
+export type QuestionLanguage = 'en' | 'hi'
+
 export type SourceStatus = 'correct' | 'incorrect' | 'skipped' | 'unknown'
 export type ProgressStatus = 'correct' | 'incorrect' | 'skipped'
 
